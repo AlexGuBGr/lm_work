@@ -6,7 +6,7 @@ torch.set_num_threads(1)
 
 
 def test_default_param_budget():
-    # kravet er ca. 1M parametre
+    # the requirement is about 1M parameters
     n = GPT(ModelConfig()).num_params()
     assert 0.9e6 <= n <= 1.1e6, n
 
@@ -25,12 +25,12 @@ def test_forward_shapes_and_loss():
     logits, loss = m(x, y)
     assert logits.shape == (3, 16, 20)
     assert loss.ndim == 0 and torch.isfinite(loss)
-    # tilfældig initialisering skal give loss tæt på ln(vocab)
+    # random initialisation should give a loss close to ln(vocab)
     assert abs(loss.item() - torch.log(torch.tensor(20.0)).item()) < 0.5
 
 
 def test_causal():
-    # ændring af et senere token må ikke påvirke logits for tidligere positioner
+    # changing a later token must not affect the logits at earlier positions
     torch.manual_seed(0)
     cfg = ModelConfig(vocab_size=20, block_size=16, n_layer=2, n_head=2, n_embd=32, mlp_hidden=64)
     m = GPT(cfg).eval()
@@ -50,7 +50,7 @@ def test_rope_preserves_norm_and_relative_position():
     k = torch.randn(1, 1, 32, 8)
     rq, rk = apply_rope(q, cos, sin), apply_rope(k, cos, sin)
     assert torch.allclose(rq.norm(dim=-1), q.norm(dim=-1), atol=1e-5)
-    # samme q/k-vektorer på (i, j) og (i+s, j+s) giver samme prik-produkt
+    # the same q/k vectors at (i, j) and (i+s, j+s) give the same dot product
     qv, kv = q[0, 0, 0], k[0, 0, 0]
     qq = qv.expand(1, 1, 32, 8).clone()
     kk = kv.expand(1, 1, 32, 8).clone()

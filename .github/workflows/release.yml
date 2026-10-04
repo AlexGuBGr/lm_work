@@ -1,7 +1,7 @@
 name: Release
 
-# CD: et versions-tag (fx `git tag v0.1.0 && git push origin v0.1.0`) kører hele CI
-# og udgiver derefter en GitHub-release med arkitekturdiagram og dokumentation.
+# CD: a version tag (e.g. `git tag v0.1.0 && git push origin v0.1.0`) runs the full CI
+# and then publishes a GitHub release with the architecture diagram and documentation.
 
 on:
   push:
@@ -21,14 +21,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Byg dokumentation
+      - name: Build documentation
         run: |
           pip install -r requirements.txt --index-url https://download.pytorch.org/whl/cpu \
             --extra-index-url https://pypi.org/simple
           python docs/make_architecture.py
           tar czf lm_work-src-${GITHUB_REF_NAME}.tar.gz \
             model.py train.py prepare.py sample.py bench.py requirements.txt NOTES.md
-      - name: Udgiv release
+      - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

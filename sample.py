@@ -1,11 +1,11 @@
 """
-Generér tekst fra seneste checkpoint.
+Generate text from the latest checkpoint.
 
     .venv/bin/python sample.py
     .venv/bin/python sample.py --prompt="Once upon a time" --num_samples=3 --temperature=0.8
     .venv/bin/python sample.py --ckpt=out/best.pt --max_new_tokens=1000 --top_k=20
 
-Generering stopper ved slutningen af en historie (<eot>), medmindre --until_eot=false.
+Generation stops at the end of a story (<eot>) unless --until_eot=false.
 """
 import argparse
 import json
@@ -41,8 +41,8 @@ ckpt = torch.load(args.ckpt, map_location="cpu", weights_only=False)
 model = GPT(ModelConfig(**ckpt["model_config"]))
 model.load_state_dict(ckpt["model"])
 model.eval()
-print(f"# {args.ckpt}: iter {ckpt['iter_num']:,}, {ckpt.get('tokens_seen', 0):,} tokens set, "
-      f"bedste val loss {ckpt['best_val_loss']:.4f}\n")
+print(f"# {args.ckpt}: iter {ckpt['iter_num']:,}, {ckpt.get('tokens_seen', 0):,} tokens seen, "
+      f"best val loss {ckpt['best_val_loss']:.4f}\n")
 
 
 def encode(s):
@@ -53,7 +53,7 @@ def decode(ids):
     return "".join("" if i == eot_id else ("�" if i == unk_id else itos[i]) for i in ids)
 
 
-start = [eot_id] + encode(args.prompt)  # <eot> først = "starten af en ny historie"
+start = [eot_id] + encode(args.prompt)  # <eot> first = "start of a new story"
 stop = eot_id if args.until_eot.lower() in ("1", "true", "yes") else None
 for n in range(args.num_samples):
     idx = torch.tensor([start], dtype=torch.long)

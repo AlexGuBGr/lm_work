@@ -1,6 +1,6 @@
 """
-Mål trænings-throughput (tokens/sek) for forskellige batch-størrelser, med og uden torch.compile.
-Kør:  .venv/bin/python bench.py [--compile] [batch sizes ...]
+Measure training throughput (tokens/sec) for different batch sizes, with and without torch.compile.
+Run:  .venv/bin/python bench.py [--compile] [batch sizes ...]
 """
 import os
 import sys
@@ -36,7 +36,7 @@ for B in sizes:
         opt.zero_grad(set_to_none=True)
 
     t0 = time.time()
-    step()  # opvarmning (inkl. kompilering)
+    step()  # warm-up (incl. compilation)
     warm = time.time() - t0
     step()
     n = 5
@@ -44,5 +44,5 @@ for B in sizes:
     for _ in range(n):
         step()
     dt = (time.time() - t0) / n
-    print(f"batch {B:>3}: {dt * 1000:7.0f} ms/iter | {B * T / dt:8,.0f} tok/s | første iter {warm:.1f} s",
+    print(f"batch {B:>3}: {dt * 1000:7.0f} ms/iter | {B * T / dt:8,.0f} tok/s | first iter {warm:.1f} s",
           flush=True)

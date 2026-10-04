@@ -1,5 +1,5 @@
 """
-Ende-til-ende MLOps-røgtest på et lille syntetisk datasæt:
+End-to-end MLOps smoke test on a small synthetic dataset:
 prepare -> train -> checkpoint -> resume -> sample.
 """
 import csv
@@ -27,7 +27,7 @@ def data_dir(tmp_path_factory):
     d = tmp_path_factory.mktemp("data")
     raw = d / "raw"
     raw.mkdir()
-    # gentag historierne, så modellen har noget at lære; '米' er et sjældent tegn -> <unk>
+    # repeat the stories so the model has something to learn; '米' is a rare char -> <unk>
     train = "\n<|endoftext|>\n".join(STORIES * 40) + "\n<|endoftext|>\n米\n"
     val = "\n<|endoftext|>\n".join(STORIES * 3) + "\n"
     (raw / "train.txt").write_text(train, encoding="utf-8")
@@ -37,7 +37,7 @@ def data_dir(tmp_path_factory):
     prepare.FILES = {"train": str(raw / "train.txt"), "val": str(raw / "val.txt")}
     prepare.OUT_DIR = str(d)
     prepare.MIN_COUNT = 2
-    prepare.CHUNK_BYTES = 500  # mange små bidder: tester at <|endoftext|> ikke deles
+    prepare.CHUNK_BYTES = 500  # many small chunks: tests that <|endoftext|> is not split
     try:
         prepare.main()
     finally:
@@ -53,8 +53,8 @@ def test_prepare_vocab_and_roundtrip(data_dir):
     assert "米" not in itos
 
     ids = np.memmap(data_dir / "train.bin", dtype=np.uint8, mode="r")
-    assert (ids == 1).sum() == len(STORIES) * 40   # alle <|endoftext|> fundet, også over bidgrænser
-    assert (ids == 0).sum() == 1                   # det sjældne tegn
+    assert (ids == 1).sum() == len(STORIES) * 40   # all <|endoftext|> found, even across chunk boundaries
+    assert (ids == 0).sum() == 1                   # the rare character
     text = "".join("|" if i == 1 else ("?" if i == 0 else itos[i]) for i in ids[:200])
     assert text.startswith(STORIES[0] + "\n|\n" + STORIES[1][:20])
 
@@ -106,7 +106,7 @@ def test_resume_continues(trained, data_dir):
     runs = [json.loads(line) for line in (trained / "runs.jsonl").read_text().splitlines()]
     assert runs[-1]["resume"] is True and runs[-1]["iter"] == 60
     iters = [int(r["iter"]) for r in read_log(trained)]
-    assert iters == sorted(iters)  # loggen fortsætter i stedet for at starte forfra
+    assert iters == sorted(iters)  # the log continues instead of starting over
 
 
 def test_sample(trained, data_dir):

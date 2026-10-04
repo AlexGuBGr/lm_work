@@ -1,15 +1,15 @@
 """
-Forbered TinyStoriesV2-GPT4 til træning på tegn-niveau.
+Prepare TinyStoriesV2-GPT4 for character-level training.
 
-Læser de rå tekstfiler i bidder (aldrig hele filen i RAM), bygger et ordforråd
-på tegn-niveau ud fra træningsdata, og skriver data/train.bin og data/val.bin
-som uint8-token-id'er, der kan læses med np.memmap.
+Reads the raw text files in chunks (never the whole file in RAM), builds a
+character-level vocabulary from the training data, and writes data/train.bin and
+data/val.bin as uint8 token ids that can be read with np.memmap.
 
-Specielle tokens:
-  0 = <unk>  (alle sjældne tegn samles her)
-  1 = <eot>  (erstatter "<|endoftext|>" mellem historier)
+Special tokens:
+  0 = <unk>  (all rare characters are collected here)
+  1 = <eot>  (replaces "<|endoftext|>" between stories)
 
-Kør:  .venv/bin/python prepare.py
+Run:  .venv/bin/python prepare.py
 """
 import json
 import os
@@ -23,17 +23,17 @@ FILES = {
     "train": os.path.join(RAW_DIR, "TinyStoriesV2-GPT4-train.txt"),
     "val": os.path.join(RAW_DIR, "TinyStoriesV2-GPT4-valid.txt"),
 }
-CHUNK_BYTES = 32 * 1024 * 1024  # ~32 MB tekst ad gangen
-MAX_VOCAB = 256                 # skal passe i uint8
-MIN_COUNT = 200                 # tegn der optræder sjældnere end dette -> <unk>
+CHUNK_BYTES = 32 * 1024 * 1024  # ~32 MB of text at a time
+MAX_VOCAB = 256                 # must fit in uint8
+MIN_COUNT = 200                 # characters rarer than this -> <unk>
 
 EOT_STR = "<|endoftext|>"
-EOT_CHAR = "\ue000"             # privat unicode-tegn, bruges kun internt
+EOT_CHAR = "\ue000"             # private-use Unicode char, internal only
 N_CODEPOINTS = 0x110000
 
 
 def iter_chunks(path):
-    """Læs filen i bidder af hele linjer, så <|endoftext|> aldrig deles."""
+    """Read the file in chunks of whole lines, so <|endoftext|> is never split."""
     with open(path, encoding="utf-8", errors="replace") as f:
         while True:
             lines = f.readlines(CHUNK_BYTES)
@@ -60,7 +60,7 @@ def build_vocab(counts):
     counts[eot_cp] = 0
     order = np.argsort(-counts, kind="stable")
     keep = [int(cp) for cp in order[: MAX_VOCAB - 2] if counts[cp] >= MIN_COUNT]
-    keep.sort()  # stabil, læsbar rækkefølge
+    keep.sort()  # stable, readable order
     itos = ["<unk>", "<eot>"] + [chr(cp) for cp in keep]
     n_unk = int(counts.sum() - counts[keep].sum())
     return itos, n_eot, n_unk
@@ -78,12 +78,12 @@ def encode_file(path, out_path, lut):
 
 def main():
     t0 = time.time()
-    print("Gennemløb 1: tæller tegn i træningsdata ...")
+    print("Pass 1: counting characters in training data ...")
     counts = count_chars(FILES["train"])
     itos, n_eot, n_unk = build_vocab(counts)
     total = int(counts.sum())
-    print(f"  {total:,} tegn, {int((counts > 0).sum())} forskellige, {n_eot:,} historier")
-    print(f"  ordforråd: {len(itos)} tokens; {n_unk:,} tegn ({n_unk / total:.5%}) -> <unk>")
+    print(f"  {total:,} chars, {int((counts > 0).sum())} distinct, {n_eot:,} stories")
+    print(f"  vocabulary: {len(itos)} tokens; {n_unk:,} chars ({n_unk / total:.5%}) -> <unk>")
 
     lut = np.zeros(N_CODEPOINTS, dtype=np.uint8)  # default 0 = <unk>
     lut[ord(EOT_CHAR)] = 1
@@ -94,12 +94,12 @@ def main():
         json.dump({"vocab_size": len(itos), "itos": itos, "unk_id": 0, "eot_id": 1}, f,
                   ensure_ascii=False, indent=0)
 
-    print("Gennemløb 2: encoder til uint8 ...")
+    print("Pass 2: encoding to uint8 ...")
     for split, path in FILES.items():
         out_path = os.path.join(OUT_DIR, f"{split}.bin")
         n = encode_file(path, out_path, lut)
         print(f"  {split}: {n:,} tokens -> {out_path}")
-    print(f"Færdig på {time.time() - t0:.0f} s")
+    print(f"Done in {time.time() - t0:.0f} s")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-# PyTorch CPU-version installeres fra: --index-url https://download.pytorch.org/whl/cpu
+# Install the PyTorch CPU build from: --index-url https://download.pytorch.org/whl/cpu
 torch>=2.4
 numpy>=1.26
 matplotlib>=3.8

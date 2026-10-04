@@ -1,16 +1,16 @@
 """
-Træning af en lille tegn-niveau GPT på TinyStories (kun CPU), i stil med nanoGPT.
+Train a small character-level GPT on TinyStories (CPU only), nanoGPT style.
 
-Alle indstillinger nedenfor kan overskrives fra kommandolinjen, fx:
+All settings below can be overridden from the command line, e.g.:
     .venv/bin/python train.py --max_iters=50000 --batch_size=32
     .venv/bin/python train.py --out_dir=out-test --max_iters=200 --init_from=scratch
 
 init_from:
-    "auto"    genoptag fra <out_dir>/ckpt.pt hvis den findes, ellers start forfra (standard)
-    "resume"  genoptag (fejl hvis der ikke er noget checkpoint)
-    "scratch" start altid forfra (overskriver checkpoints i out_dir)
+    "auto"    resume from <out_dir>/ckpt.pt if it exists, otherwise start from scratch (default)
+    "resume"  resume (error if there is no checkpoint)
+    "scratch" always start from scratch (overwrites checkpoints in out_dir)
 
-Stop pænt med Ctrl+C eller `kill <pid>` (SIGTERM): der gemmes et checkpoint før afslutning.
+Stop gracefully with Ctrl+C or `kill <pid>` (SIGTERM): a checkpoint is saved before exiting.
 """
 import json
 import math
@@ -25,7 +25,7 @@ import torch
 
 from model import GPT, ModelConfig
 
-# ---------------------------------------------------------------- konfiguration
+# ---------------------------------------------------------------- configuration
 out_dir = "out"
 data_dir = "data"
 init_from = "auto"
@@ -35,33 +35,33 @@ n_head = 4
 n_embd = 128
 mlp_hidden = 352
 block_size = 256
-# træning
+# training
 batch_size = 32
 grad_accum = 1
-max_iters = 30_000       # <- loft over antal iterationer (~2 døgn på denne server)
+max_iters = 30_000       # <- cap on the number of iterations (~2 days on this server)
 learning_rate = 3e-3
 min_lr = 3e-4
 warmup_iters = 500
-lr_decay_iters = None    # None = max_iters (cosinus-henfald til min_lr)
+lr_decay_iters = None    # None = max_iters (cosine decay to min_lr)
 weight_decay = 0.1
 beta1, beta2 = 0.9, 0.95
 grad_clip = 1.0
-# evaluering, logging, checkpoints
+# evaluation, logging, checkpoints
 eval_interval = 1000
 eval_iters = 50
 log_interval = 50
-ckpt_interval = 1000     # gem ckpt.pt så ofte (desuden ved hver eval og ved stop)
+ckpt_interval = 1000     # save ckpt.pt this often (also at every eval and on stop)
 # system
 threads = os.cpu_count()
 dtype = "auto"           # "auto" | "float32" | "bfloat16"
 compile = False
 seed = 1337
 
-# simpel CLI-override: --navn=værdi
+# simple CLI override: --name=value
 for arg in sys.argv[1:]:
-    assert arg.startswith("--") and "=" in arg, f"ugyldigt argument: {arg}"
+    assert arg.startswith("--") and "=" in arg, f"invalid argument: {arg}"
     key, val = arg[2:].split("=", 1)
-    assert key in globals(), f"ukendt indstilling: {key}"
+    assert key in globals(), f"unknown setting: {key}"
     old = globals()[key]
     if isinstance(old, bool):
         val = val.lower() in ("1", "true", "yes")
@@ -93,8 +93,8 @@ def cpu_supports_bf16():
 
 
 if compile:
-    # torch.compile (inductor) skal bruge en C++-compiler; systemet har ingen, så vi bruger
-    # den brugerlokale gcc fra conda-forge (se LOG.md)
+    # torch.compile (inductor) needs a C++ compiler; the system has none, so we use
+    # the user-local gcc from conda-forge (see LOG.md)
     cxx = os.path.expanduser("~/.local/share/toolchain/bin/x86_64-conda-linux-gnu-g++")
     if os.path.exists(cxx):
         os.environ.setdefault("CXX", cxx)
@@ -113,7 +113,7 @@ vocab_size = meta["vocab_size"]
 
 
 def get_batch(split):
-    # ny memmap hver gang (undgår at sider ophobes i RAM), tilfældige udsnit
+    # new memmap every time (avoids pages piling up in RAM), random slices
     data = np.memmap(os.path.join(data_dir, f"{split}.bin"), dtype=np.uint8, mode="r")
     ix = np.random.randint(0, len(data) - block_size - 1, size=batch_size)
     x = np.stack([data[i:i + block_size] for i in ix]).astype(np.int64)
@@ -149,11 +149,11 @@ if resume:
 
 raw_model = model
 if compile:
-    print("kompilerer model med torch.compile ...")
+    print("compiling model with torch.compile ...")
     model = torch.compile(model)
 
-print(f"{'genoptager fra iter ' + str(iter_num) if resume else 'starter forfra'} | "
-      f"{raw_model.num_params():,} parametre | dtype={dtype} | threads={threads} | compile={compile}")
+print(f"{'resuming from iter ' + str(iter_num) if resume else 'starting from scratch'} | "
+      f"{raw_model.num_params():,} parameters | dtype={dtype} | threads={threads} | compile={compile}")
 print(f"model: {asdict(mcfg)}")
 
 
@@ -199,10 +199,10 @@ def save_checkpoint(path):
     }
     tmp = path + ".tmp"
     torch.save(ckpt, tmp)
-    os.replace(tmp, path)  # atomisk: et afbrudt save ødelægger aldrig det gamle checkpoint
+    os.replace(tmp, path)  # atomic: an interrupted save never corrupts the old checkpoint
 
 
-# logfiler: CSV til tal, og konfiguration ved hver (gen)start
+# log files: CSV for metrics, and the configuration at every (re)start
 log_path = os.path.join(out_dir, "train_log.csv")
 new_log = not os.path.exists(log_path) or not resume
 with open(log_path, "w" if new_log else "a") as f:
@@ -219,22 +219,22 @@ def log_row(kind, loss="", val_loss="", lr="", tps=""):
                 f"{lr},{tps},{tokens_seen}\n")
 
 
-# pænt stop ved Ctrl+C / SIGTERM
+# graceful stop on Ctrl+C / SIGTERM
 stop_requested = False
 
 
 def _request_stop(signum, frame):
     global stop_requested
     stop_requested = True
-    print(f"\nsignal {signum} modtaget: gemmer checkpoint og stopper efter denne iteration ...")
+    print(f"\nsignal {signum} received: saving checkpoint and stopping after this iteration ...")
 
 
 signal.signal(signal.SIGINT, _request_stop)
 signal.signal(signal.SIGTERM, _request_stop)
 
-# ---------------------------------------------------------------- træningsløkke
+# ---------------------------------------------------------------- training loop
 tokens_per_iter = batch_size * grad_accum * block_size
-print(f"tokens pr. iteration: {tokens_per_iter:,} | max_iters: {max_iters:,}")
+print(f"tokens per iteration: {tokens_per_iter:,} | max_iters: {max_iters:,}")
 X, Y = get_batch("train")
 t_log = time.time()
 iters_since_log = 0
@@ -276,9 +276,9 @@ while iter_num < max_iters and not stop_requested:
             best_val_loss = losses["val"]
             save_checkpoint(best_path)
         save_checkpoint(ckpt_path)
-        t_log, iters_since_log = time.time(), 0  # eval-tid tæller ikke med i tok/s
+        t_log, iters_since_log = time.time(), 0  # eval time is not counted in tok/s
     elif iter_num % ckpt_interval == 0:
         save_checkpoint(ckpt_path)
 
 save_checkpoint(ckpt_path)
-print(f"stoppet ved iter {iter_num:,} ({tokens_seen:,} tokens). checkpoint: {ckpt_path}")
+print(f"stopped at iter {iter_num:,} ({tokens_seen:,} tokens). checkpoint: {ckpt_path}")

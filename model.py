@@ -1,7 +1,7 @@
 """
-Lille decoder-only transformer i Llama-stil:
-RMSNorm (pre-norm), RoPE, SwiGLU, kausal attention via F.scaled_dot_product_attention,
-og delte vægte mellem token-embedding og output-lag. Ingen bias-led.
+Small Llama-style decoder-only transformer:
+RMSNorm (pre-norm), RoPE, SwiGLU, causal attention via F.scaled_dot_product_attention,
+and tied weights between the token embedding and the output layer. No bias terms.
 """
 import math
 from dataclasses import dataclass
@@ -14,11 +14,11 @@ import torch.nn.functional as F
 @dataclass
 class ModelConfig:
     vocab_size: int = 87
-    block_size: int = 256   # kontekstlængde (tegn)
+    block_size: int = 256   # context length (characters)
     n_layer: int = 5
     n_head: int = 4
     n_embd: int = 128
-    mlp_hidden: int = 352   # ~8/3 * n_embd, rundet op til et multiplum af 32
+    mlp_hidden: int = 352   # ~8/3 * n_embd, rounded up to a multiple of 32
     rope_theta: float = 10000.0
     norm_eps: float = 1e-5
 
@@ -30,7 +30,7 @@ def rope_cache(head_dim, seq_len, theta):
 
 
 def apply_rope(x, cos, sin):
-    # x: (B, H, T, hd); par af tilstødende dimensioner roteres
+    # x: (B, H, T, hd); pairs of adjacent dimensions are rotated
     x1, x2 = x[..., 0::2], x[..., 1::2]
     out = torch.stack((x1 * cos - x2 * sin, x1 * sin + x2 * cos), dim=-1)
     return out.flatten(-2)
@@ -87,14 +87,14 @@ class GPT(nn.Module):
         self.blocks = nn.ModuleList(Block(cfg) for _ in range(cfg.n_layer))
         self.norm = nn.RMSNorm(cfg.n_embd, eps=cfg.norm_eps)
         self.lm_head = nn.Linear(cfg.n_embd, cfg.vocab_size, bias=False)
-        self.lm_head.weight = self.tok_emb.weight  # delte vægte
+        self.lm_head.weight = self.tok_emb.weight  # tied weights
 
         cos, sin = rope_cache(cfg.n_embd // cfg.n_head, cfg.block_size, cfg.rope_theta)
         self.register_buffer("rope_cos", cos, persistent=False)
         self.register_buffer("rope_sin", sin, persistent=False)
 
         self.apply(self._init_weights)
-        # GPT-2-agtig skalering af residual-projektioner
+        # GPT-2-style scaling of residual projections
         for name, p in self.named_parameters():
             if name.endswith("proj.weight") or name.endswith("down.weight"):
                 nn.init.normal_(p, mean=0.0, std=0.02 / math.sqrt(2 * cfg.n_layer))
@@ -104,11 +104,11 @@ class GPT(nn.Module):
             nn.init.normal_(m.weight, mean=0.0, std=0.02)
 
     def num_params(self):
-        return sum(p.numel() for p in self.parameters())  # delte vægte tælles én gang
+        return sum(p.numel() for p in self.parameters())  # tied weights are counted once
 
     def forward(self, idx, targets=None):
         T = idx.shape[1]
-        assert T <= self.cfg.block_size, f"sekvens {T} > block_size {self.cfg.block_size}"
+        assert T <= self.cfg.block_size, f"sequence {T} > block_size {self.cfg.block_size}"
         cos, sin = self.rope_cos[:T], self.rope_sin[:T]
         x = self.tok_emb(idx)
         for block in self.blocks:

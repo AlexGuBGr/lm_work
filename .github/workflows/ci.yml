@@ -16,14 +16,14 @@ permissions:
 
 jobs:
   hygiene:
-    name: Repo-hygiejne (filstørrelse, artefakter)
+    name: Repo hygiene (file size, artifacts)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Ingen filer > 50 MB, ingen data/checkpoints i git
+      - name: No files > 50 MB, no data/checkpoints in git
         run: python scripts/check_repo.py
 
   lint:
@@ -38,7 +38,7 @@ jobs:
       - run: ruff check --output-format=github .
 
   test:
-    name: Tests + MLOps-røgtest
+    name: Tests + MLOps smoke test
     needs: [hygiene, lint]
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -51,14 +51,14 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: requirements*.txt
-      - name: Installér afhængigheder (PyTorch CPU)
+      - name: Install dependencies (PyTorch CPU)
         run: |
           pip install -r requirements.txt --index-url https://download.pytorch.org/whl/cpu \
             --extra-index-url https://pypi.org/simple
           pip install -r requirements-dev.txt
-      - name: Unit-tests og pipeline (prepare → train → resume → sample)
+      - name: Unit tests and pipeline (prepare → train → resume → sample)
         run: python -m pytest -v --basetemp=ci_tmp --junitxml=ci_tmp/junit.xml
-      - name: Model- og træningsrapport
+      - name: Model and training report
         if: always()
         run: |
           python - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
@@ -67,29 +67,29 @@ jobs:
           from model import GPT, ModelConfig
           m = GPT(ModelConfig())
           print("## Model\n")
-          print(f"- Standardkonfiguration: `{ModelConfig()}`")
-          print(f"- Parametre: **{m.num_params():,}** (krav: ca. 1M)")
+          print(f"- Default configuration: `{ModelConfig()}`")
+          print(f"- Parameters: **{m.num_params():,}** (target: about 1M)")
           print(f"- torch {torch.__version__}\n")
           logs = sorted(glob.glob("ci_tmp/out[0-9]*/train_log.csv"))
           if logs:
               rows = list(csv.DictReader(open(logs[0])))
               tr = [r for r in rows if r["kind"] == "train"]
               ev = [r for r in rows if r["kind"] == "eval"]
-              print("## Røgtræning (syntetisk data, lille model)\n")
-              print("| | værdi |\n|---|---|")
-              print(f"| train loss første → sidste | {tr[0]['loss']} → {tr[-1]['loss']} |")
-              print(f"| val loss første → sidste | {ev[0]['val_loss']} → {ev[-1]['val_loss']} |")
-              print(f"| iterationer | {rows[-1]['iter']} |")
+              print("## Smoke training (synthetic data, tiny model)\n")
+              print("| | value |\n|---|---|")
+              print(f"| train loss first → last | {tr[0]['loss']} → {tr[-1]['loss']} |")
+              print(f"| val loss first → last | {ev[0]['val_loss']} → {ev[-1]['val_loss']} |")
+              print(f"| iterations | {rows[-1]['iter']} |")
               tps = sorted(float(r['tokens_per_sec']) for r in tr)
               print(f"| median tok/s (runner) | {tps[len(tps) // 2]:,.0f} |")
           EOF
-      - name: Arkitekturdiagram genereres
+      - name: Generate architecture diagram
         run: python docs/make_architecture.py
-      - name: Gem artefakter
+      - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ci-artefakter
+          name: ci-artifacts
           path: |
             ci_tmp/junit.xml
             ci_tmp/out[0-9]*/train_log.csv

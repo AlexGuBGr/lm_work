@@ -1,8 +1,8 @@
 """
-Repo-hygiejne: afvis store filer og trænings-artefakter i git.
+Repo hygiene: reject large files and training artifacts in git.
 
-    python scripts/check_repo.py            # tjek alle sporede filer
-    python scripts/check_repo.py --staged   # tjek kun filer i staging (til pre-commit hook)
+    python scripts/check_repo.py            # check all tracked files
+    python scripts/check_repo.py --staged   # check staged files only (for the pre-commit hook)
 """
 import fnmatch
 import os
@@ -24,13 +24,13 @@ def main():
     problems = []
     for path in tracked_files("--staged" in sys.argv):
         if any(fnmatch.fnmatch(path, pat) for pat in FORBIDDEN):
-            problems.append(f"{path}: data/checkpoints/miljø hører ikke til i git")
+            problems.append(f"{path}: data/checkpoints/environments do not belong in git")
         if os.path.isfile(path) and os.path.getsize(path) > MAX_BYTES:
             problems.append(f"{path}: {os.path.getsize(path) / 1e6:.1f} MB > 50 MB")
     if problems:
-        print("Repo-tjek fejlede:\n  " + "\n  ".join(problems))
+        print("Repo check failed:\n  " + "\n  ".join(problems))
         sys.exit(1)
-    print("Repo-tjek OK")
+    print("Repo check OK")
 
 
 if __name__ == "__main__":
