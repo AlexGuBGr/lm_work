@@ -1,0 +1,24 @@
+[project]
+name = "lm_work"
+version = "0.1.0"
+description = "Lille tegn-niveau GPT (Llama-stil) trænet på TinyStories på CPU"
+requires-python = ">=3.10"
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+extend-exclude = [".venv", "data", "out"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E402", "B905", "UP006", "UP035"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["model", "prepare"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff.lint.per-file-ignores]
+"docs/make_architecture.py" = ["E501"]
