@@ -118,3 +118,17 @@ Chronological log of what was done and how.
 ## 2026-10-04 — English documentation
 - All documentation, code comments, docstrings, script output, workflow step names and diagram labels
   translated from Danish to English. Commit messages are written in English from now on.
+
+## 2026-10-07 — Evaluation (`evaluate.py`, report in `docs/eval/EVAL.md`)
+- Full validation set (22.16M chars, non-overlapping 256-char windows, `out/best.pt`):
+  **0.594 nats = 0.857 bits/char** (perplexity 1.81 per char). Took ~1¾ h on this CPU.
+- Character n-gram baselines (Witten-Bell, trained on 100M train chars, scored on 5M val chars):
+  1-gram 4.42 → 3-gram 2.39 → 5-gram 1.52 → 8-gram 1.18 bits/char. The transformer scores 0.858 on
+  the same characters: **27% below the best n-gram**.
+- Loss by position: 3.34 bits/char with 1 char of context, 1.26 at 8, 0.86 at 64, 0.76 at 256 – still falling
+  at the end of the window, so the model uses all 256 characters and a longer context would likely help.
+  With full context (~0.76) the model is ~35% below the 8-gram.
+- Generated stories (50, temperature 0.8) vs 500 real validation stories: known-word rate 99.70% vs 99.85%,
+  repeated word 4-grams 0.84% vs 0.83%, finished with <eot> 76% vs 71%. These surface metrics are almost
+  identical to real text, so they cannot capture what is still wrong (logic and consistency, e.g. "She asked her
+  mom if she could eat the swing"). Measuring coherence needs a judge (an LLM rating), not done yet.

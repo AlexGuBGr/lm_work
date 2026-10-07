@@ -36,6 +36,14 @@ Start over: `--init_from=scratch` (overwrites the checkpoints in `out/`) or use 
 ```
 Can be run while training is running (briefly shares the 2 cores, though).
 
+## Evaluate
+```bash
+.venv/bin/python evaluate.py                 # all stages (~2½ h on this server)
+.venv/bin/python evaluate.py --stage=report  # rebuild docs/eval/EVAL.md from saved results
+```
+Stages: `val` (full validation loss + loss by position), `ngram` (n-gram baselines), `gen` (generated vs
+real stories), `report`. Raw results in `out/eval/`, report and plot in `docs/eval/`.
+
 ## Files
 | file | contents |
 |---|---|
@@ -43,6 +51,7 @@ Can be run while training is running (briefly shares the 2 cores, though).
 | `model.py` | Llama-style transformer (RMSNorm, RoPE, SwiGLU, SDPA, tied weights), 1,016,064 parameters |
 | `train.py` | training; settings at the top of the file or `--name=value` |
 | `sample.py` | text generation |
+| `evaluate.py` | evaluation: validation loss, n-gram baselines, loss by position, generated text |
 | `bench.py` | speed measurement: `.venv/bin/python bench.py [--compile] 16 32` |
 | `out/` | `ckpt.pt`, `best.pt`, `train_log.csv`, `runs.jsonl`, `train.out` |
 | `LOG.md` | detailed log of setup and decisions |
