@@ -4,6 +4,7 @@ Generate text from the latest checkpoint.
     .venv/bin/python sample.py
     .venv/bin/python sample.py --prompt="Once upon a time" --num_samples=3 --temperature=0.8
     .venv/bin/python sample.py --ckpt=out/best.pt --max_new_tokens=1000 --top_k=20
+    .venv/bin/python sample.py --ckpt=docs/demo/model.json   # weights in the repo, no training needed
 
 Generation stops at the end of a story (<eot>) unless --until_eot=false.
 """
@@ -13,7 +14,7 @@ import os
 
 import torch
 
-from model import GPT, ModelConfig
+from model import GPT, ModelConfig, load_exported
 
 p = argparse.ArgumentParser()
 p.add_argument("--ckpt", default="out/ckpt.pt")
@@ -31,18 +32,24 @@ torch.set_num_threads(os.cpu_count())
 if args.seed is not None:
     torch.manual_seed(args.seed)
 
-with open(os.path.join(args.data_dir, "meta.json"), encoding="utf-8") as f:
-    meta = json.load(f)
-itos = meta["itos"]
+if args.ckpt.endswith(".json"):  # exported weights in the repo (docs/demo/model.json + model.bin)
+    model, meta = load_exported(args.ckpt)
+    itos, unk_id, eot_id = meta["itos"], meta["unk_id"], meta["eot_id"]
+    print(f"# {args.ckpt}: iter {meta['iter']:,}, best val loss {meta['val_loss']:.4f}\n")
+else:
+    ckpt = torch.load(args.ckpt, map_location="cpu", weights_only=False)
+    if "itos" in ckpt:  # release file (tinystories-char-1m.pt) carries its own vocabulary
+        itos, unk_id, eot_id = ckpt["itos"], 0, 1
+    else:
+        with open(os.path.join(args.data_dir, "meta.json"), encoding="utf-8") as f:
+            meta = json.load(f)
+        itos, unk_id, eot_id = meta["itos"], meta["unk_id"], meta["eot_id"]
+    model = GPT(ModelConfig(**ckpt["model_config"]))
+    model.load_state_dict(ckpt["model"])
+    model.eval()
+    print(f"# {args.ckpt}: iter {ckpt['iter_num']:,}, {ckpt.get('tokens_seen', 0):,} tokens seen, "
+          f"best val loss {ckpt['best_val_loss']:.4f}\n")
 stoi = {ch: i for i, ch in enumerate(itos) if i >= 2}
-unk_id, eot_id = meta["unk_id"], meta["eot_id"]
-
-ckpt = torch.load(args.ckpt, map_location="cpu", weights_only=False)
-model = GPT(ModelConfig(**ckpt["model_config"]))
-model.load_state_dict(ckpt["model"])
-model.eval()
-print(f"# {args.ckpt}: iter {ckpt['iter_num']:,}, {ckpt.get('tokens_seen', 0):,} tokens seen, "
-      f"best val loss {ckpt['best_val_loss']:.4f}\n")
 
 
 def encode(s):

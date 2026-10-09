@@ -1,0 +1,115 @@
+{
+ "headline": {
+  "params": 1016064,
+  "train_chars": 245760000,
+  "wall_clock_hours": 45.1,
+  "median_tokens_per_sec": 1557,
+  "train_petaflop": 1.5,
+  "val_bits_per_char": 0.8569,
+  "val_bits_per_char_full_context": 0.764,
+  "best_ngram_order": 8,
+  "best_ngram_bits": 1.1783,
+  "transformer_bits_same_chars": 0.8579,
+  "improvement_over_best_ngram_pct": 27.2
+ },
+ "throughput": {
+  "batch": [
+   8,
+   16,
+   32,
+   64
+  ],
+  "eager": [
+   1164,
+   1373,
+   1448,
+   1554
+  ],
+  "compile": [
+   1371,
+   1550,
+   1532,
+   1588
+  ]
+ },
+ "embeddings": {
+  "pca_explained": [
+   0.498,
+   0.043
+  ],
+  "nearest_class_centroid_accuracy": 0.771
+ },
+ "surprisal_by_role": {
+  "1st letter of a word": {
+   "mean_bits": 2.249,
+   "share_of_chars": 0.2,
+   "share_of_total_bits": 0.579
+  },
+  "2nd letter": {
+   "mean_bits": 0.705,
+   "share_of_chars": 0.191,
+   "share_of_total_bits": 0.174
+  },
+  "3rd letter": {
+   "mean_bits": 0.387,
+   "share_of_chars": 0.166,
+   "share_of_total_bits": 0.083
+  },
+  "4th+ letter": {
+   "mean_bits": 0.176,
+   "share_of_chars": 0.201,
+   "share_of_total_bits": 0.046
+  },
+  "space after a word": {
+   "mean_bits": 0.214,
+   "share_of_chars": 0.166,
+   "share_of_total_bits": 0.046
+  },
+  "punctuation": {
+   "mean_bits": 1.092,
+   "share_of_chars": 0.04,
+   "share_of_total_bits": 0.056
+  },
+  "line break": {
+   "mean_bits": 0.864,
+   "share_of_chars": 0.007,
+   "share_of_total_bits": 0.008
+  },
+  "end of story <eot>": {
+   "mean_bits": 0.291,
+   "share_of_chars": 0.001,
+   "share_of_total_bits": 0.0
+  }
+ },
+ "surprisal_story": {
+  "chars": 654,
+  "mean_bits": 0.8,
+  "hardest": [
+   {
+    "bits": 8.53,
+    "context": " homes. Before ",
+    "char": "g"
+   },
+   {
+    "bits": 7.99,
+    "context": "\nOne ",
+    "char": "m"
+   },
+   {
+    "bits": 7.2,
+    "context": " stretch. He st",
+    "char": "r"
+   },
+   {
+    "bits": 7.16,
+    "context": " happy because ",
+    "char": "t"
+   },
+   {
+    "bits": 7.1,
+    "context": "ired. They had ",
+    "char": "p"
+   }
+  ]
+ }
+}

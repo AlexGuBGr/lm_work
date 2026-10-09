@@ -140,3 +140,24 @@ class GPT(nn.Module):
             if stop_id is not None and (nxt == stop_id).all():
                 break
         return idx
+
+
+def load_exported(json_path):
+    """Load the exported model (docs/demo/model.json + model.bin, float32) – the format the browser
+    demo uses. Returns (model, meta)."""
+    import json
+    import os
+
+    import numpy as np
+
+    with open(json_path, encoding="utf-8") as f:
+        meta = json.load(f)
+    w = np.fromfile(os.path.join(os.path.dirname(json_path), "model.bin"), dtype="<f4")
+    model = GPT(ModelConfig(**meta["config"]))
+    sd = {}
+    for n, t in meta["tensors"].items():
+        a = w[t["offset"]:t["offset"] + int(np.prod(t["shape"]))]
+        sd[n] = torch.from_numpy(a.reshape(t["shape"]).copy())
+    sd["lm_head.weight"] = sd["tok_emb.weight"]
+    model.load_state_dict(sd)
+    return model.eval(), meta

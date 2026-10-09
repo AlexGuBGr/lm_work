@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tiny character-level storyteller – runs in your browser</title>
+<style>
+  :root { --bg:#f7f8fa; --card:#fff; --ink:#1c2330; --muted:#5d6878; --line:#dde2e8; --accent:#2f6db5;
+          --accent-ink:#fff; color-scheme: light; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#12161c; --card:#1a2029; --ink:#e6eaf0; --muted:#98a3b3; --line:#2b3441; --accent:#6aa3e8;
+            --accent-ink:#0d1520; color-scheme: dark; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width: 820px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 18px; font-size: .95rem; }
+  .tabs { display:flex; gap:6px; margin-bottom: 10px; }
+  .tabs button { background: transparent; color: var(--muted); border:1px solid var(--line); }
+  .tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; }
+  textarea { width:100%; min-height:90px; resize:vertical; border:1px solid var(--line); border-radius:10px;
+             padding:10px 12px; font: 15px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+             background:var(--bg); color:var(--ink); }
+  .row { display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; margin-top:10px; }
+  label { color:var(--muted); font-size:.9rem; display:flex; align-items:center; gap:6px; }
+  input[type=range] { width:110px; }
+  button { font:inherit; border:0; border-radius:10px; padding:8px 16px; cursor:pointer; background:var(--accent);
+           color:var(--accent-ink); font-weight:600; }
+  button:disabled { opacity:.5; cursor:progress; }
+  #out, #ana { margin-top:14px; white-space:pre-wrap; font: 15px/1.7 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+               min-height: 3em; }
+  #out span, #ana span { border-radius: 2px; }
+  .legend { display:flex; align-items:center; gap:8px; font-size:.8rem; color:var(--muted); margin-top:10px; }
+  .bar { height:10px; width:180px; border-radius:5px;
+         background: linear-gradient(90deg, rgba(255,255,204,.0), #feb24c, #e31a1c, #800026); }
+  .stat { color:var(--muted); font-size:.88rem; margin-top:8px; }
+  footer { margin-top: 28px; color: var(--muted); font-size: .82rem; }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>A 1-million-parameter storyteller, in your browser</h1>
+  <p class="sub">A character-level language model trained for two days on a 2-vCPU server from 2013,
+    by an AI coding agent. It writes one letter at a time. Nothing is sent anywhere – the 4 MB model runs
+    on your device. <span id="status">Loading model…</span></p>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="gen">Write a story</button>
+    <button role="tab" aria-selected="false" data-tab="ana">Analyse a text</button>
+  </div>
+
+  <section class="card" id="tab-gen">
+    <textarea id="prompt">Once upon a time, there was a little girl named Lily. She</textarea>
+    <div class="row">
+      <label>Temperature <input id="temp" type="range" min="0.3" max="1.5" step="0.05" value="0.8">
+        <span id="tempv">0.80</span></label>
+      <label><input id="conf" type="checkbox" checked> colour by surprise</label>
+      <button id="go" disabled>Write</button>
+      <button id="stop" hidden>Stop</button>
+    </div>
+    <div id="out"></div>
+    <div class="legend"><span>expected</span><span class="bar"></span><span>surprising</span></div>
+    <div class="stat" id="genstat"></div>
+  </section>
+
+  <section class="card" id="tab-ana" hidden>
+    <textarea id="text">Once upon a time, there was a little dog named Max. Max liked to play with his red ball in the park. One day, the ball rolled into the pond.</textarea>
+    <div class="row"><button id="analyse" disabled>Colour by surprise</button>
+      <span class="stat">Each character is coloured by how many bits the model needed to predict it.
+        Try misspellings or unusual names.</span></div>
+    <div id="ana"></div>
+    <div class="legend"><span>0 bits</span><span class="bar"></span><span>6+ bits</span></div>
+    <div class="stat" id="anastat"></div>
+  </section>
+
+  <footer>
+    Model trained on <a href="https://huggingface.co/datasets/roneneldan/TinyStories">TinyStoriesV2-GPT4</a>
+    (CDLA-Sharing-1.0). It only knows simple English children's stories and often loses the plot.
+    <a href="https://github.com/AlexGuBGr/lm_work">Code and write-up on GitHub</a>.
+  </footer>
+</main>
+<script type="module">
+import { CharGPT } from "./model.js";
+
+const $ = (id) => document.getElementById(id);
+let model = null, running = false;
+
+function colour(bits) {
+  const t = Math.max(0, Math.min(1, bits / 6));
+  const stops = [[255, 255, 204, 0], [254, 178, 76, .55], [227, 26, 28, .7], [128, 0, 38, .85]];
+  const x = t * (stops.length - 1), i = Math.min(stops.length - 2, Math.floor(x)), f = x - i;
+  const c = stops[i].map((v, k) => v + (stops[i + 1][k] - v) * f);
+  return `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${c[3].toFixed(2)})`;
+}
+function span(ch, bits, coloured) {
+  const s = document.createElement("span");
+  s.textContent = ch;
+  if (coloured) { s.style.background = colour(bits); s.title = `${bits.toFixed(2)} bits`; }
+  return s;
+}
+
+document.querySelectorAll(".tabs button").forEach((b) => b.onclick = () => {
+  document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-selected", x === b));
+  $("tab-gen").hidden = b.dataset.tab !== "gen";
+  $("tab-ana").hidden = b.dataset.tab !== "ana";
+});
+$("temp").oninput = () => $("tempv").textContent = (+$("temp").value).toFixed(2);
+
+CharGPT.load(".").then((m) => {
+  model = m;
+  $("status").textContent = `Model loaded (${m.meta.config.n_layer} layers, vocabulary of ${m.V} characters).`;
+  $("go").disabled = $("analyse").disabled = false;
+}).catch((e) => $("status").textContent = "Could not load the model: " + e.message);
+
+$("go").onclick = async () => {
+  running = true; $("go").disabled = true; $("stop").hidden = false;
+  const out = $("out"); out.textContent = "";
+  const prompt = $("prompt").value, temp = +$("temp").value, coloured = $("conf").checked;
+  model.reset();
+  out.append(span(prompt, 0, false));
+  let logits = model.prefill([model.meta.eot_id, ...model.encode(prompt)]);
+  let n = 0, totalBits = 0;
+  const t0 = performance.now();
+  while (running && n < 1500) {
+    for (let k = 0; k < 4 && running; k++) {             // a few characters per frame keeps the page smooth
+      const next = model.sample(logits, temp);
+      if (next === model.meta.eot_id) { running = false; break; }
+      const bits = -Math.log2(CharGPT.softmax(logits)[next]);
+      totalBits += bits; n++;
+      out.append(span(model.decode(next), bits, coloured));
+      logits = model.step(next);
+    }
+    await new Promise(requestAnimationFrame);
+  }
+  const secs = (performance.now() - t0) / 1000;
+  $("genstat").textContent = `${n} characters in ${secs.toFixed(1)} s (${(n / secs).toFixed(0)} chars/s), ` +
+    `average surprise ${(totalBits / Math.max(n, 1)).toFixed(2)} bits/char` + (n >= 1500 ? " – stopped at 1,500" : "");
+  running = false; $("go").disabled = false; $("stop").hidden = true;
+};
+$("stop").onclick = () => running = false;
+
+$("analyse").onclick = async () => {
+  const text = $("text").value, ana = $("ana");
+  ana.textContent = ""; $("analyse").disabled = true;
+  model.reset();
+  let logits = model.step(model.meta.eot_id), total = 0, worst = [];
+  const chars = [...text];
+  for (let i = 0; i < chars.length; i++) {
+    const id = model.encode(chars[i])[0];
+    const bits = -Math.log2(CharGPT.softmax(logits)[id]);
+    total += bits; worst.push([bits, i]);
+    ana.append(span(chars[i], bits, true));
+    logits = model.step(id);
+    if (i % 40 === 39) await new Promise(requestAnimationFrame);
+  }
+  worst.sort((a, b) => b[0] - a[0]);
+  $("anastat").textContent = `Average ${(total / chars.length).toFixed(2)} bits per character ` +
+    `(the model averages 0.86 on its validation stories). Most surprising: ` +
+    worst.slice(0, 3).map(([b, i]) => `“${chars.slice(Math.max(0, i - 8), i).join("")}[${chars[i]}]” ${b.toFixed(1)} bits`).join(", ");
+  $("analyse").disabled = false;
+};
+</script>
+</body>
+</html>

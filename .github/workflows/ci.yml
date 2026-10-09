@@ -56,7 +56,10 @@ jobs:
           pip install -r requirements.txt --index-url https://download.pytorch.org/whl/cpu \
             --extra-index-url https://pypi.org/simple
           pip install -r requirements-dev.txt
-      - name: Unit tests and pipeline (prepare → train → resume → sample)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Unit tests and pipeline (prepare → train → resume → sample, browser demo vs PyTorch)
         run: python -m pytest -v --basetemp=ci_tmp --junitxml=ci_tmp/junit.xml
       - name: Model and training report
         if: always()

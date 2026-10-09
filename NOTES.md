@@ -51,6 +51,9 @@ real stories), `report`. Raw results in `out/eval/`, report and plot in `docs/ev
 | `model.py` | Llama-style transformer (RMSNorm, RoPE, SwiGLU, SDPA, tied weights), 1,016,064 parameters |
 | `train.py` | training; settings at the top of the file or `--name=value` |
 | `sample.py` | text generation |
+| `analysis/figures.py` | README figures and `docs/figures/findings.json` (needs `evaluate.py` results) |
+| `analysis/export_weights.py` | exports `out/best.pt` to `docs/demo/model.{json,bin}` for the browser demo |
+| `docs/demo/` | browser demo (plain JavaScript, KV cache) + exported weights; served by GitHub Pages |
 | `evaluate.py` | evaluation: validation loss, n-gram baselines, loss by position, generated text |
 | `bench.py` | speed measurement: `.venv/bin/python bench.py [--compile] 16 32` |
 | `out/` | `ckpt.pt`, `best.pt`, `train_log.csv`, `runs.jsonl`, `train.out` |

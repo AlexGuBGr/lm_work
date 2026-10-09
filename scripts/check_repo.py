@@ -11,6 +11,7 @@ import sys
 
 MAX_BYTES = 50 * 1024 * 1024
 FORBIDDEN = ["*.bin", "*.pt", "*.pth", "*.safetensors", "*.ckpt", "data/*", "out/*", ".venv/*"]
+ALLOWED = {"docs/demo/model.bin"}  # the exported 4 MB model used by the browser demo
 
 
 def tracked_files(staged):
@@ -23,7 +24,7 @@ def tracked_files(staged):
 def main():
     problems = []
     for path in tracked_files("--staged" in sys.argv):
-        if any(fnmatch.fnmatch(path, pat) for pat in FORBIDDEN):
+        if path not in ALLOWED and any(fnmatch.fnmatch(path, pat) for pat in FORBIDDEN):
             problems.append(f"{path}: data/checkpoints/environments do not belong in git")
         if os.path.isfile(path) and os.path.getsize(path) > MAX_BYTES:
             problems.append(f"{path}: {os.path.getsize(path) / 1e6:.1f} MB > 50 MB")

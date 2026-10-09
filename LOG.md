@@ -132,3 +132,26 @@ Chronological log of what was done and how.
   repeated word 4-grams 0.84% vs 0.83%, finished with <eot> 76% vs 71%. These surface metrics are almost
   identical to real text, so they cannot capture what is still wrong (logic and consistency, e.g. "She asked her
   mom if she could eat the swing"). Measuring coherence needs a judge (an LLM rating), not done yet.
+
+## 2026-10-09 — Write-up, figures and browser demo
+- README rewritten as an English write-up around the question "can an AI coding agent build a language model
+  on a CPU from 2013?", with a glossary of technical terms.
+- `analysis/figures.py` → `docs/figures/` (+ `findings.json`): learning curve, n-gram comparison, throughput vs
+  batch size, character-embedding PCA, surprisal heat map and surprisal by role of the character.
+  - The first surprisal version scored one 256-char window at a time and took >25 min for 400k chars;
+    batched (64 windows) it takes ~4 min for 200k chars; results are cached in `out/eval/`.
+  - Findings: first letters of words are 20% of characters but **58% of all bits**; letters from the 4th
+    onwards cost 0.18 bits; names become cheap after their first mention. Embedding PCA: axis 1 (50%) =
+    frequent vs rare characters, axis 2 = lower case vs capitals/digits; nearest-group-centroid accuracy 77%.
+  - The training passed the 8-gram baseline (1.178 bits/char) between iteration 2,000 (1.193) and 3,000 (1.134),
+    i.e. after ~4.5 h.
+- `analysis/export_weights.py`: weights as float32 (`docs/demo/model.bin`, 4.06 MB, tied head stored once) +
+  `model.json`; `out/tinystories-char-1m.pt` (4.08 MB, no optimizer state).
+- Browser demo `docs/demo/` (plain JS, KV cache, context slides to the last 128 chars when full): write mode
+  and analyse mode. `tests/test_demo.py` runs the JS model in Node.js (installed user-locally with micromamba)
+  and checks next-character logits against PyTorch (max diff < 0.002), including a >256-char prompt.
+  ~13 ms per character on this server.
+- `sample.py` can load `docs/demo/model.json` or the release `.pt`, so the repo works without training.
+- `scripts/check_repo.py` allows exactly `docs/demo/model.bin` (other `*.bin` files stay forbidden).
+- Licence check: TinyStories is CDLA-Sharing-1.0; §3.5 places no obligations on *Results* (trained weights,
+  generated text). The dataset itself is not redistributed.

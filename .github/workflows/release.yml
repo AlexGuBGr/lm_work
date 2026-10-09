@@ -27,7 +27,8 @@ jobs:
             --extra-index-url https://pypi.org/simple
           python docs/make_architecture.py
           tar czf lm_work-src-${GITHUB_REF_NAME}.tar.gz \
-            model.py train.py prepare.py sample.py bench.py requirements.txt NOTES.md
+            model.py train.py prepare.py sample.py bench.py evaluate.py requirements.txt NOTES.md README.md
+          tar czf tinystories-char-1m-${GITHUB_REF_NAME}.tar.gz -C docs/demo model.json model.bin
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -35,4 +36,4 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" --generate-notes \
             docs/architecture.png docs/architecture.svg NOTES.md \
-            lm_work-src-${GITHUB_REF_NAME}.tar.gz
+            lm_work-src-${GITHUB_REF_NAME}.tar.gz tinystories-char-1m-${GITHUB_REF_NAME}.tar.gz
